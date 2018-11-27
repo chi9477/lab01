@@ -1,89 +1,72 @@
-http = require('http');
-cors = require('cors');
+var http = require('http');
+var url = require('url');
+var mongoose = require('mongoose');
 
-var express = require('express');
-var app = express();
-var APIKEY = "";  //signup at api.openweathermap.org and obtain an API Key
+//const mongourl = 'mongodb://localhost/test';
+const mongourl = 'mongodb://developer:developer123@ds031873.mlab.com:31873/comps381f';
 
-var options = {
-    host: 'api.openweathermap.org',
-    port: 80,
-    path: '/data/2.5/weather?q=Tokyo,jp&units=metric',
-    method: 'GET'
-};
+var kittySchema = require('./models/kitty');
 
-app.use(cors());
+var server = http.createServer(function (req,res) {
+	var parsedURL = url.parse(req.url,true); //true to get query as object
+	var queryAsObject = parsedURL.query;
 
-app.set('view engine', 'ejs');
-
-app.get('/', function(req,res) {
-	res.render('getcity');
+	switch(parsedURL.pathname) {
+		case '/create':
+			mongoose.connect(mongourl);
+			var db = mongoose.connection;
+			//db.on('error', console.error.bind(console, 'connection error:'));
+			db.on('error',function(callback) {
+				console.error.bind(console, 'connection error:');
+				res.writeHead(500,{"Content-Type":"text/plain"});
+				res.end('MongoDB connection error!');				
+			});
+			db.once('open', function (callback) {
+				var Kitten = mongoose.model('Kitten', kittySchema);
+				var new_k = {};
+				new_k['name'] = queryAsObject.name;
+				new_k['age'] = queryAsObject.age;
+				var fluffy = new Kitten(new_k);
+				// consider calling fluffy.validate() before save()
+				fluffy.save(function(err) {
+					//if (err) throw err
+					if (err) {
+						console.log('save() error ' + err.name);
+						res.writeHead(500,{"Content-Type":"text/plain"});
+						res.end(JSON.stringify(err.name));
+					} else {
+						console.log('Kitten created!')
+						res.writeHead(200,{"Content-Type":"text/plain"});
+						res.end("Created: " + JSON.stringify(new_k));
+					}
+					db.close();
+				});
+			});
+			break;
+		case '/delete':
+			mongoose.connect(mongourl);
+			var db = mongoose.connection;
+			//db.on('error', console.error.bind(console, 'connection error:'));
+			db.on('error',function(callback) {
+				console.error.bind(console, 'connection error:');
+				res.writeHead(500,{"Content-Type":"text/plain"});
+				res.end('MongoDB connection error!');				
+			});
+			db.once('open', function (callback) {
+				var Kitten = mongoose.model('Kitten', kittySchema);
+				Kitten.remove(queryAsObject,function(err) {
+					if (err) throw err
+					console.log('documents deleted!')
+					db.close();
+					res.writeHead(200,{"Content-Type":"text/plain"});
+					res.end("documents deleted!");
+				});
+			});
+			break;
+		default:
+			res.writeHead(404,{"Content-Type":"text/plain"});
+			res.end("Error: " + parsedURL.pathname + " not implemented!");
+	}
 });
 
-app.get('/weather',function(req,res) {
-	var city = req.query.city;
-
-	console.log("City: " + city);
-	setOptionPath(city);
-	getWeatherDetails(function(data){ 
-			data.city = city.toUpperCase();
-			res.render('weather', data);
-	}); 
-}); // end of app.get()
-
-app.get('/api/weather',function(req,res) {
-	var city = req.query.city;
-
-	console.log("City: " + city);
-	setOptionPath(city);
-	getWeatherDetails(function(data) {
-		res.json(data);
-	})
-})
-
-app.listen(process.env.PORT || 8099);
-
-function setOptionPath(city) {
-	options.path = "/data/2.5/weather?q=" + city.replace(/ /g,"+") + "&units=metric&APPID=" + APIKEY;
-}
-
-function getWeatherDetails(callback) {
-	var currTemp = 'N/A';
-	var maxTemp = 'N/A';
-	var minTemp = 'N/A';
-	var humidity = 'N/A';
-
-	var wreq = http.request(options, function(wres,res) {
-   	wres.setEncoding('utf8');
-
-		wres.on('data', function (chunk) {
-			var jsonObj = JSON.parse(chunk);
-			if (!jsonObj.hasOwnProperty("main")) {
-				jsonObj.main = 'N/A';
-			}
-			console.log("Current Temp. : " + jsonObj.main.temp);
-			console.log("Max Temp : "      + jsonObj.main.temp_max);
-			console.log("Min Temp : "      + jsonObj.main.temp_min);
-			console.log("Humidity : "      + jsonObj.main.humidity);
-									
-			currTemp = jsonObj.main.temp;
-			maxTemp = jsonObj.main.temp_max;
-			minTemp = jsonObj.main.temp_min;
-			humidity = jsonObj.main.humidity;
-		});
-
-		wres.on('error',function(e) {
-			console.log('Problem with request: ' + e.message);
-		});
-
-		wres.on('end',function(chunk) {
-			callback({currTemp: currTemp,
-			          maxTemp: maxTemp,
-			          minTemp: minTemp,
-			          humidity: humidity});
-		});
-  }); //http.request
-	
-	wreq.end();
-}
-
+server.listen(process.env.PORT || 8099);
