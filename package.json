@@ -1,10 +1,11 @@
 {
-    "name": "server",
-    "description": "ODM App",
+    "name": "demo",
+    "description": "RESTful",
     "author": "Raymond SO <rso@ouhk.edu.hk>",
     "version": "0.0.1",
     "dependencies": {
-        "mongoose": "~4.0.0"
+        "express": "*",
+        "ejs": "*"
     },
     "engine": "node >= 0.10.0",
     "scripts": {
